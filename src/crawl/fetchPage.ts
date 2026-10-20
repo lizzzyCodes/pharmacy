@@ -1,32 +1,38 @@
 import type { Page } from "playwright";
-import { mkdir, readFile, writeFile } from "fs/promises";
-import path from "path";
-import { SLEEP_TIME } from "./consts";
+import { defaultCache, type CacheStorage } from "./cache";
+import { DEFAULT_SLEEP_TIME_MS } from "../shared/urls";
 
-const CACHE_DIR = path.resolve("cache");
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// https://www.nhs.uk/medicines/lansoprazole/about-lansoprazole/
-//   → cache/lansoprazole/about-lansoprazole.html
-function cachePath(url: string): string {
-  const parts = new URL(url).pathname.split("/").filter(Boolean); // ["medicines","lansoprazole","about-lansoprazole"]
-  const [, slug, sub] = parts;
-  return path.join(CACHE_DIR, slug, `${sub ?? "index"}.html`);
-}
+export type FetchPageOptions = {
+  cache?: CacheStorage;
+  sleepMs?: number;
+};
 
-export async function fetchPage(page: Page, url: string): Promise<string> {
-  const file = cachePath(url);
+/**
+ * Fetches the HTML of a page using Playwright, backed by cache and polite rate limiting.
+ */
+export async function fetchPage(
+  page: Page,
+  url: string,
+  options: FetchPageOptions = {}
+): Promise<string> {
+  const cache = options.cache ?? defaultCache;
+  const sleepMs = options.sleepMs ?? DEFAULT_SLEEP_TIME_MS;
 
-  try {
-    return await readFile(file, "utf8"); // already saved → no network
-  } catch {}
+  const cached = await cache.get(url);
+  if (cached !== null) {
+    return cached;
+  }
 
   await page.goto(url, { waitUntil: "domcontentloaded" });
   const html = await page.content();
 
-  await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(file, html, "utf8");
+  await cache.set(url, html);
 
-  await sleep(SLEEP_TIME); // be polite: pause between real requests
+  if (sleepMs > 0) {
+    await sleep(sleepMs);
+  }
+
   return html;
 }

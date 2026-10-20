@@ -1,2 +1,8 @@
-export const MEDICINES_INDEX_URL = "https://www.nhs.uk/medicines/";
-export const SLEEP_TIME = 500;
+import {
+  MEDICINES_INDEX_BASE_URL,
+  MEDICINES_INDEX_URL,
+  DEFAULT_SLEEP_TIME_MS,
+} from "../shared/urls";
+
+export { MEDICINES_INDEX_BASE_URL, MEDICINES_INDEX_URL };
+export const SLEEP_TIME = DEFAULT_SLEEP_TIME_MS;

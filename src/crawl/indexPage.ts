@@ -1,34 +1,55 @@
 import type { Page } from "playwright";
-import { MEDICINES_INDEX_URL } from "./consts";
+import * as cheerio from "cheerio";
+import { fetchPage, type FetchPageOptions } from "./fetchPage";
+import {
+  MEDICINES_INDEX_URL,
+  NHS_BASE_URL,
+  isMedicineRootPath,
+} from "../shared/urls";
+import { cleanText } from "../shared/text";
+import type { MedicineLink } from "../shared/types";
 
-export type MedicineLink = { name: string; url: string };
+export type { MedicineLink };
 
-export async function getMedicineLinks(page: Page): Promise<MedicineLink[]> {
-  await page.goto(MEDICINES_INDEX_URL, { waitUntil: "domcontentloaded" });
+/**
+ * Extracts and filters medicine links from the NHS medicines A-Z index HTML.
+ * Pure function: testable without Playwright.
+ */
+export function parseMedicineIndexHtml(html: string): MedicineLink[] {
+  const $ = cheerio.load(html);
+  const links: MedicineLink[] = [];
 
-  // fetching all elements storing med name and url
-  const links = await page.locator("li a").evaluateAll((elements) =>
-    elements.map((el) => ({
-      name: el.textContent?.trim() ?? "",
-      url: (el as HTMLAnchorElement).href,
-    }))
-  );
+  $("li a").each((_, el) => {
+    const name = cleanText($(el).text());
+    const href = $(el).attr("href");
+    if (!href || !name) return;
 
-  /**
-   * A link is kept only if:
-    it has no # (not an A–Z jump link), and
-    its path is exactly /medicines/<slug>/ (a real medicine page, not nav or a sub-page), and
-    its text isn’t a “see …” alias.
-   */
-  const medicines = links.filter((link) => {
-    const { pathname, hash } = new URL(link.url);
-    return (
-      !hash &&
-      /^\/medicines\/[^/]+\/?$/.test(pathname) &&
-      !link.name.includes(", see ")
-    );
+    try {
+      const parsedUrl = new URL(href, NHS_BASE_URL);
+      const isMedicinePage =
+        !parsedUrl.hash &&
+        isMedicineRootPath(parsedUrl.pathname) &&
+        !name.includes(", see ");
+
+      if (isMedicinePage) {
+        links.push({ name, url: parsedUrl.href });
+      }
+    } catch {
+      // Ignore invalid URLs
+    }
   });
-  const allmeds = [...new Map(medicines.map((m) => [m.url, m])).values()];
-  console.log(allmeds, "all meds here [ec]");
-  return allmeds;
+
+  // Deduplicate by URL
+  return [...new Map(links.map((item) => [item.url, item])).values()];
+}
+
+/**
+ * Fetches the NHS medicines index page and returns all valid medicine links.
+ */
+export async function getMedicineLinks(
+  page: Page,
+  options?: FetchPageOptions
+): Promise<MedicineLink[]> {
+  const html = await fetchPage(page, MEDICINES_INDEX_URL, options);
+  return parseMedicineIndexHtml(html);
 }
