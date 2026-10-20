@@ -97,11 +97,21 @@
   },
   "Antibiotics": {
     "url": "https://www.nhs.uk/medicines/antibiotics/",
-    "subPages": []
+    "subPages": [
+      "https://www.nhs.uk/medicines/antibiotics/uses/",
+      "https://www.nhs.uk/medicines/antibiotics/side-effects/",
+      "https://www.nhs.uk/medicines/antibiotics/interactions/",
+      "https://www.nhs.uk/medicines/antibiotics/antibiotic-antimicrobial-resistance/"
+    ]
   },
   "Anticoagulant medicines": {
     "url": "https://www.nhs.uk/medicines/anticoagulants/",
-    "subPages": []
+    "subPages": [
+      "https://www.nhs.uk/medicines/anticoagulants/uses/",
+      "https://www.nhs.uk/medicines/anticoagulants/dosage/",
+      "https://www.nhs.uk/medicines/anticoagulants/considerations/",
+      "https://www.nhs.uk/medicines/anticoagulants/side-effects/"
+    ]
   },
   "Antidepressants": {
     "url": "https://www.nhs.uk/medicines/antidepressants/",

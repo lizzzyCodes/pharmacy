@@ -62,14 +62,6 @@ nhs.uk/medicines ─▶ A–Z index ─▶ each medicine ─▶ its sub-pages �
    - **Safe URL Utilities (`urls.ts`)**: Canonical URL builders and path parsers that prevent duplicate-slash errors (e.g. `medicines//aspirin/`) and validate route patterns.
    - **Text Utilities (`text.ts`)**: Reusable string cleaners for collapsing whitespace, normalizing `&nbsp;`, and stripping leading heading numbers.
 
-### Core Principles Applied
-
-- **DRY (Don't Repeat Yourself)**: Section key mapping was previously duplicated across sub-page filename checks and heading regexes; it is now unified in `sectionKeys.ts`. URL formatting logic is centralized in `urls.ts`.
-- **Single Responsibility Principle (SRP)**: Every module has one clear responsibility. Crawlers don't parse business domain models, parsers don't access the disk or network, and assemblers don't read files.
-- **Dependency Inversion Principle (DIP)**: `fetchPage` accepts an injectable `CacheStorage` and sleep options rather than hardcoding disk operations, enabling straightforward unit testing.
-- **Single Level of Abstraction (SLAP)**: High-level orchestrators (`buildBundle`, `crawlMedicine`) delegate to mid-level domain assemblers and low-level pure string/DOM helpers.
-- **KISS & Testability**: Parser and assembler functions are pure, deterministic functions, allowing the test suite to execute 60 tests in under 2 seconds without Chromium.
-
 ### Tool choices
 
 - **Playwright** (recommended in the brief) handles navigation: it opens pages and saves `page.content()`.
@@ -162,6 +154,8 @@ The 253 medicine pages come in six layouts. The crawler detects which one each p
 - Navigation, breadcrumb and `#a`…`#z` jump links are filtered out by URL shape: only `/medicines/<slug>/` is kept.
 - **11 alias entries** such as "Tegretol, see Carbamazepine (Tegretol)" point to medicines already in the list and are skipped.
 - Duplicate links are de-duplicated by URL.
+- **Hub related links use different markup:** the heading is wrapped in `div.beta-hub-related-links-title`, so the list is found after the wrapper. HRT's single "Related information" box is split by URL: NHS `/conditions/` pages → `relatedConditions`, everything else → `usefulResources`.
+- **Hub review dates:** hub main pages have no `lastReviewed` in their JSON-LD, so the most recent date from their sub-pages is used.
 
 **Crawling**
 

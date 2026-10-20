@@ -5,11 +5,12 @@ import type { CrawledMedicine, CrawledPage } from "../shared/types";
 
 export type { CrawledPage, CrawledMedicine };
 
-// Hubs come in two styles:
+// Hubs come in three styles:
 //  - a key-links list (lansoprazole, peppermint oil, ...)
 //  - clickable cards (hormone replacement therapy, insulin)
+//  - a guide contents list, "Pages in this guide" (antibiotics, anticoagulants)
 const SUBPAGE_LINK_SELECTOR =
-  ".nhsuk-hub-key-links__list-item a, a.nhsuk-card__link";
+  ".nhsuk-hub-key-links__list-item a, a.nhsuk-card__link, a.nhsuk-contents-list__link";
 
 /**
  * Extracts unique sub-page URLs from a hub medicine's HTML without launching a browser.

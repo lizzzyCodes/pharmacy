@@ -1,7 +1,7 @@
 import { chromium, type Browser } from "playwright";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
-import { crawlMedicine } from "./medicinepage";
+import { crawlMedicine } from "./medicinePage";
 import { getMedicineLinks } from "./indexPage";
 import type { MedicineLink } from "../shared/types";
 
@@ -75,8 +75,7 @@ export async function crawlAllMedicines(
     }
 
     console.log(
-      `Done: ${Object.keys(manifest).length} saved to ${outputFile}, ${
-        failures.length
+      `Done: ${Object.keys(manifest).length} saved to ${outputFile}, ${failures.length
       } failed`
     );
 

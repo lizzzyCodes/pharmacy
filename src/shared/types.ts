@@ -45,6 +45,7 @@ export type ParsedPage = {
   relatedConditions: Link[];
   usefulResources: Link[];
   relatedMedicines: string[];
+  guidePageTitle: string | null;
 };
 
 export const ALL_SECTION_KEYS = [

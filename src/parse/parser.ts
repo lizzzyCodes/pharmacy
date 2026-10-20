@@ -45,13 +45,22 @@ function resolveCalloutLevel(el: Cheerio<Element>): CalloutLevel {
 /**
  * Turn paragraphs, lists, and headings inside an element into Blocks in DOM order.
  */
-function extractBlocksFrom($: CheerioAPI, root: Cheerio<AnyNode>): Block[] {
+function extractBlocksFrom(
+  $: CheerioAPI,
+  root: Cheerio<AnyNode>,
+  titleHeading?: Cheerio<AnyNode> // the h2 used as the section's own title — not repeated in its content
+): Block[] {
   const blocks: Block[] = [];
 
   // `summary` = the title of an expandable section (<details>), e.g. "Tablets for skin infections".
   // It becomes a heading block so it's clear which form (tablets / cream / ointment) the text is about.
-  root.find("p, ul, ol, h3, h4, summary").each((_, node) => {
+  // h2 is included for sections with more than one h2 (e.g. co-codamol for children:
+  // "Who can take co-codamol" + "Who may not be able to take co-codamol" in one <section>)
+  root.find("p, ul, ol, h2, h3, h4, summary").each((_, node) => {
     const el = $(node);
+
+    // the section's own title is stored as section.heading
+    if (titleHeading?.length && titleHeading.is(el)) return;
 
     // Card headings are stored as callout.heading, don't duplicate into content
     if (el.hasClass("nhsuk-card__heading")) return;
@@ -177,15 +186,50 @@ function extractLinksUnderHeading($: CheerioAPI, headingText: string): Link[] {
     .filter((_, el) => cleanText($(el).text()) === headingText)
     .first();
 
-  return h2
-    .nextAll("ul")
-    .first()
+  if (!h2.length) return [];
+
+  // Single/stub pages: <h2> and <ul> are siblings inside a feature card.
+  // Hub pages: the <h2> is wrapped in <div class="beta-hub-related-links-title">, and the <ul> follows that div.
+  let list = h2.nextAll("ul").first();
+  if (!list.length) list = h2.parent().nextAll("ul").first();
+
+  return list
     .find("a")
     .map((_, a) => ({
       name: cleanText($(a).text()),
       url: new URL($(a).attr("href") ?? "", NHS_BASE_URL).href,
     }))
     .get();
+}
+
+/** NHS condition/symptom pages, as opposed to charities and other external resources. */
+const isConditionLink = (url: string) =>
+  /^https:\/\/www\.nhs\.uk\/(conditions|symptoms)\//.test(url);
+
+/**
+ * Related conditions and useful resources.
+ * Most pages have separate "Related conditions" / "Useful resources" boxes; some hubs (HRT)
+ * have one mixed "Related information" box, which is split by URL.
+ */
+function extractRelatedLinks($: CheerioAPI): {
+  relatedConditions: Link[];
+  usefulResources: Link[];
+} {
+  const mixed = [
+    "Related information",
+    "Related links",
+    "Related resources",
+  ].flatMap((h) => extractLinksUnderHeading($, h));
+  return {
+    relatedConditions: [
+      ...extractLinksUnderHeading($, "Related conditions"),
+      ...mixed.filter((l) => isConditionLink(l.url)),
+    ],
+    usefulResources: [
+      ...extractLinksUnderHeading($, "Useful resources"),
+      ...mixed.filter((l) => !isConditionLink(l.url)),
+    ],
+  };
 }
 
 /**
@@ -243,7 +287,7 @@ export function parsePage(html: string): ParsedPage {
       return {
         id: h2.attr("id") || section.attr("id") || null,
         heading: stripHeadingNumbering(extractVisibleText($, h2)),
-        content: extractBlocksFrom($, section),
+        content: extractBlocksFrom($, section, h2),
         callouts: extractCalloutsFrom($, section),
       };
     })
@@ -272,13 +316,19 @@ export function parsePage(html: string): ParsedPage {
       /discontinued|withdrawn|(not currently|no longer) available/i.test(
         description
       ),
-    // two hub styles: a key-links list (lansoprazole) or clickable cards (HRT, insulin)
+    // three hub styles: key-links list (lansoprazole), clickable cards (HRT, insulin),
+    // guide contents list (antibiotics)
     isHub:
-      main.find(".nhsuk-hub-key-links__list-item, a.nhsuk-card__link").length >
-      0,
+      main.find(
+        ".nhsuk-hub-key-links__list-item, a.nhsuk-card__link, a.nhsuk-contents-list__link"
+      ).length > 0,
+    // On guide pages the h1 caption is the guide name ("Antibiotics"), so the page's own name
+    // ("Side effects") comes from the highlighted item in "Pages in this guide"
+    guidePageTitle:
+      cleanText(main.find(".nhsuk-contents-list__current").first().text()) ||
+      null,
     sections,
-    relatedConditions: extractLinksUnderHeading($, "Related conditions"),
-    usefulResources: extractLinksUnderHeading($, "Useful resources"),
+    ...extractRelatedLinks($),
     relatedMedicines: extractRelatedMedicineHrefs($, article),
   };
 }
