@@ -15,6 +15,13 @@ import { NHS_BASE_URL } from "../shared/urls";
 
 export type { Block, Callout, Section, Link, ParsedPage };
 
+// Boxes that are pulled out of the normal text and stored as callouts:
+//  - care cards (999 / 111 / pharmacist), warning cards ("Important")
+//  - inset text ("If you're told to go to A&E…", "More about side effects")
+const CALLOUT_SELECTOR =
+  ".nhsuk-card--care, .nhsuk-card--warning, .nhsuk-inset-text";
+const CALLOUT_CONTAINER = ".nhsuk-card, .nhsuk-inset-text";
+
 /**
  * Text of an element without screen-reader-only bits like "Non-urgent advice: ".
  */
@@ -41,7 +48,9 @@ function resolveCalloutLevel(el: Cheerio<Element>): CalloutLevel {
 function extractBlocksFrom($: CheerioAPI, root: Cheerio<AnyNode>): Block[] {
   const blocks: Block[] = [];
 
-  root.find("p, ul, ol, h3, h4").each((_, node) => {
+  // `summary` = the title of an expandable section (<details>), e.g. "Tablets for skin infections".
+  // It becomes a heading block so it's clear which form (tablets / cream / ointment) the text is about.
+  root.find("p, ul, ol, h3, h4, summary").each((_, node) => {
     const el = $(node);
 
     // Card headings are stored as callout.heading, don't duplicate into content
@@ -49,8 +58,8 @@ function extractBlocksFrom($: CheerioAPI, root: Cheerio<AnyNode>): Block[] {
 
     // Skip nested blocks inside a callout card (callouts are collected separately),
     // unless we are parsing that card itself
-    const card = el.closest(".nhsuk-card");
-    if (card.length && !root.closest(".nhsuk-card").is(card)) return;
+    const box = el.closest(CALLOUT_CONTAINER);
+    if (box.length && !root.closest(CALLOUT_CONTAINER).is(box)) return;
 
     // Skip lists inside lists being counted twice
     if (
@@ -80,23 +89,37 @@ function extractBlocksFrom($: CheerioAPI, root: Cheerio<AnyNode>): Block[] {
 }
 
 /**
- * Extracts NHS care cards and warning callouts.
+ * Extracts NHS care cards, warning cards and inset text boxes as callouts.
  */
 function extractCalloutsFrom($: CheerioAPI, root: Cheerio<AnyNode>): Callout[] {
   return root
-    .find(".nhsuk-card--care, .nhsuk-card--warning")
+    .find(CALLOUT_SELECTOR)
     .map((_, node) => {
-      const card = $(node);
+      const box = $(node);
+
+      if (box.hasClass("nhsuk-inset-text")) {
+        // Inset boxes: title is an optional h3 ("More about side effects"),
+        // otherwise use the screen-reader label ("Information: " → "Information")
+        const h3 = box.find("h3").first();
+        const label = cleanText(
+          box.children(".nhsuk-u-visually-hidden").first().text()
+        ).replace(/:$/, "");
+        const heading = h3.length
+          ? extractVisibleText($, h3)
+          : label || "Information";
+        const content = extractBlocksFrom($, box).filter(
+          (b) => !(b.type === "heading" && b.text === heading)
+        );
+        return { level: "info" as const, heading, content };
+      }
+
       return {
-        level: resolveCalloutLevel(card),
+        level: resolveCalloutLevel(box),
         heading: extractVisibleText(
           $,
-          card.find(".nhsuk-card__heading").first()
+          box.find(".nhsuk-card__heading").first()
         ),
-        content: extractBlocksFrom(
-          $,
-          card.find(".nhsuk-card__content").first()
-        ),
+        content: extractBlocksFrom($, box.find(".nhsuk-card__content").first()),
       };
     })
     .get();
@@ -244,10 +267,12 @@ export function parsePage(html: string): ParsedPage {
     genericName,
     summary: cleanText(main.find(".nhsuk-lede-text").first().text()) || null,
     lastReviewed,
+    // foam says "discontinued", ranitidine says "not currently available in the UK, or globally"
     discontinued:
       /discontinued|withdrawn|(not currently|no longer) available/i.test(
         description
       ),
+    // two hub styles: a key-links list (lansoprazole) or clickable cards (HRT, insulin)
     isHub:
       main.find(".nhsuk-hub-key-links__list-item, a.nhsuk-card__link").length >
       0,

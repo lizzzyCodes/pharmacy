@@ -28,8 +28,14 @@ export function createEmptySections(): Record<SectionKey, SectionData | null> {
 
 /**
  * Combines several parsed sections (e.g. all sections of one sub-page) into one SectionData.
+ * `heading` is the original title from the NHS page, e.g. "What aciclovir is for" or
+ * "Side effects of lansoprazole" — kept so the bundle doesn't lose it when mapping to a key.
  */
-export function mergeSections(url: string, sections: Section[]): SectionData {
+export function mergeSections(
+  url: string,
+  sections: Section[],
+  heading: string | null = null
+): SectionData {
   const content: Block[] = sections.flatMap((section) =>
     sections.length > 1 && section.heading
       ? [
@@ -41,7 +47,7 @@ export function mergeSections(url: string, sections: Section[]): SectionData {
 
   const callouts: Callout[] = sections.flatMap((section) => section.callouts);
 
-  return { url, content, callouts };
+  return { url, heading, content, callouts };
 }
 
 /**
@@ -78,7 +84,7 @@ export function assembleMedicine(
 
     for (const { subSlug, page } of subPages) {
       const subUrl = buildMedicineUrl(slug, subSlug);
-      const data = mergeSections(subUrl, page.sections);
+      const data = mergeSections(subUrl, page.sections, page.title || null);
       const key = sectionKeyForSubpage(subSlug);
 
       if (key) {
@@ -112,7 +118,7 @@ export function assembleMedicine(
       if (key === "skip") continue;
 
       const sectionUrl = section.id ? `${mainUrl}#${section.id}` : mainUrl;
-      const data = mergeSections(sectionUrl, [section]);
+      const data = mergeSections(sectionUrl, [section], section.heading);
 
       const replacesIntro = key === "about" && aboutIsIntro;
       if (key && (!sections[key] || replacesIntro)) {

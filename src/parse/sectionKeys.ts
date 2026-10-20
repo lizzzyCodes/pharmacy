@@ -28,6 +28,7 @@ const SUBPAGE_PREFIXES: [prefix: string, key: SectionKey][] = [
   ["about-", "about"],
   ["who-can-and-cannot-", "whoCanAndCannotTake"],
   ["how-and-when-", "howAndWhenToTake"],
+  ["when-to-take-", "howAndWhenToTake"],
   ["side-effects-", "sideEffects"],
   ["pregnancy-", "pregnancyAndBreastfeeding"],
   ["taking-", "interactions"],
@@ -52,9 +53,7 @@ export function isSkipHeading(heading: string): boolean {
  * Resolves a SectionKey for a sub-page filename or slug (e.g., "about-lansoprazole" -> "about").
  */
 export function sectionKeyForSubpage(subSlug: string): SectionKey | null {
-  const match = SUBPAGE_PREFIXES.find(([prefix]) =>
-    subSlug.startsWith(prefix)
-  );
+  const match = SUBPAGE_PREFIXES.find(([prefix]) => subSlug.startsWith(prefix));
   return match ? match[1] : null;
 }
 

@@ -62,6 +62,7 @@ export type SectionKey = (typeof ALL_SECTION_KEYS)[number];
 export type SectionData = {
   url: string;
   content: Block[];
+  heading: string | null;
   callouts: Callout[];
 };
 
